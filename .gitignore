@@ -1,0 +1,18 @@
+# Secrets and local env
+.env
+.env.*
+!.env.example
+
+# Internal working notes (customer-specific context, specs, drafts)
+internal/*
+!internal/.gitkeep
+
+# OS / editor
+.DS_Store
+.idea/
+*.swp
+*~
+
+# Temp artifacts
+*.log
+tmp/

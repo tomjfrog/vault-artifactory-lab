@@ -2,65 +2,70 @@
 
 Companion lab for the [vault-plugin-secrets-artifactory](https://github.com/jfrog/vault-plugin-secrets-artifactory) integration.
 
-This repository holds **lab setup, demo scripts, and customer-facing runbooks**. The plugin source lives in a separate repo (`vault-plugin-secrets-artifactory`).
-
-## Prerequisites
-
-- JFrog Cloud sandbox or Artifactory 7.42.1+ (7.50.3+ for expiring tokens)
-- [HashiCorp Vault CLI](https://developer.hashicorp.com/vault/docs/install)
-- Go 1.25+, GoReleaser (to build the plugin from source)
-- `curl`, `jq`
+Validates the customer use-case: **Kubernetes namespace + service account → Vault Kubernetes auth → External Secrets Operator → scoped Artifactory prod image pull**.
 
 ## Quick start
 
-1. Copy the environment template and fill in your sandbox values:
+1. Copy environment template and fill in sandbox values:
 
    ```sh
    cp .env.example .env
-   # edit .env — never commit this file
+   # edit .env — never commit; VAULT_TOKEN=root is local dev only
    ```
 
-2. Build the plugin (in the sibling `vault-plugin-secrets-artifactory` repo):
+2. Build the plugin (sibling repo):
 
    ```sh
    cd ../vault-plugin-secrets-artifactory
    make build
    ```
 
-3. Start Vault and configure the plugin:
+3. Bootstrap Vault and the plugin:
 
    ```sh
+   cd ../vault-artifactory-lab
    source .env
    ./scripts/setup-vault.sh
    ```
 
-4. Prepare Artifactory groups and verify connectivity:
+4. Follow the canonical runbook through Phases 1–3:
+
+   **[docs/setup-and-validation.md](docs/setup-and-validation.md)**
+
+5. Validate the automated pull path:
 
    ```sh
-   ./scripts/setup-artifactory.sh
+   ./scripts/demo-kubernetes-auth.sh   # Layer 2: SA → Vault
+   ./scripts/demo-eso.sh               # Primary: ESO → pod pull
    ```
 
-5. Run the demo scenarios:
+**Visual architecture:** [docs/visual-architecture.md](docs/visual-architecture.md)
 
-   ```sh
-   ./scripts/demo.sh
-   ```
+## Lab status
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 0 | Plugin + Vault bootstrap | Done |
+| 1 | ASK123 Artifactory RBAC + Vault role | Done |
+| 2 | Vault Kubernetes auth (`workload-sa` → policy) | Done |
+| 3 | External Secrets Operator (VaultDynamicSecret) | Done |
+| 4 | Multi-app isolation (ASK456) | Done |
 
 ## Repository layout
 
 | Path | Purpose |
 |------|---------|
-| `scripts/` | Setup and demo automation |
-| `policies/` | Vault policies for lab roles |
-| `docs/` | Architecture notes and customer-facing deep dives |
-| `internal/` | **Local only** — specs, discovery notes, customer context (gitignored) |
-| `.env.example` | Required environment variables (no secrets) |
+| `assets/` | Pull-verification Docker images — [inventory](assets/README.md) |
+| `scripts/` | Setup and validation automation |
+| `policies/` | Vault policies per CMDB app |
+| `k8s/eso/` | VaultDynamicSecret + ExternalSecret manifests |
+| `docs/setup-and-validation.md` | **Canonical runbook** |
+| `docs/visual-architecture.md` | ERD + sequence diagrams |
+| `docs/appendix/` | History, break-glass, deep dives |
+| `internal/` | Local only — customer context (gitignored) |
+| `.env.example` | Required environment variables |
 
 ## Related repos
 
 - **Plugin source:** [jfrog/vault-plugin-secrets-artifactory](https://github.com/jfrog/vault-plugin-secrets-artifactory)
-- **Workspace:** open `~/code/cursor-workspaces/vault-artifactory-lab.code-workspace` in Cursor to work across both repos
-
-## Lab status
-
-See [docs/lab-log.md](docs/lab-log.md) for executed steps, decisions, and version history.
+- **Workspace:** `~/code/cursor-workspaces/vault-artifactory-lab.code-workspace`

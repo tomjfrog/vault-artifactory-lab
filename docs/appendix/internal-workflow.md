@@ -1,8 +1,6 @@
 # Internal working notes
 
-Use the `internal/` directory (gitignored) for material that should **not** be shared with customers:
-
-- Customer discovery notes and constraints
+Customer discovery notes live in `internal/` (gitignored) — **do not edit** `internal/customer-requirements.md`; lab answers go in `docs/`.
 - Draft specs and open questions
 - Environment-specific URLs or credentials (never commit secrets — use `.env`)
 - Failed approaches and debugging notes
@@ -19,4 +17,4 @@ internal/
 └── sandbox-notes.md       # tenant-specific quirks
 ```
 
-Customer-facing content belongs in `README.md`, `docs/`, and `scripts/` instead.
+Customer-facing content belongs in [../setup-and-validation.md](../setup-and-validation.md), [../visual-architecture.md](../visual-architecture.md), `README.md`, and `scripts/`.

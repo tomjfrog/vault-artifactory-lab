@@ -15,7 +15,14 @@ LAB_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 : "${JFROG_URL:?Set JFROG_URL in .env}"
 : "${JFROG_ACCESS_TOKEN:?Set JFROG_ACCESS_TOKEN in .env}"
 
-PLUGIN_REPO="$(cd "${LAB_ROOT}/${PLUGIN_REPO}" 2>/dev/null && pwd || cd "${PLUGIN_REPO}" && pwd)"
+if [[ -d "${LAB_ROOT}/${PLUGIN_REPO}" ]]; then
+  PLUGIN_REPO="$(cd "${LAB_ROOT}/${PLUGIN_REPO}" && pwd)"
+elif [[ -d "${PLUGIN_REPO}" ]]; then
+  PLUGIN_REPO="$(cd "${PLUGIN_REPO}" && pwd)"
+else
+  echo "ERROR: plugin repo not found (tried ${LAB_ROOT}/${PLUGIN_REPO} and ${PLUGIN_REPO})" >&2
+  exit 1
+fi
 
 echo "==> Plugin repo: ${PLUGIN_REPO}"
 echo "==> Vault:       ${VAULT_ADDR}"
@@ -40,4 +47,4 @@ echo "==> Verifying config..."
 vault read "${PLUGIN_VAULT_PATH}/config/admin"
 
 echo ""
-echo "Done. Next: ./scripts/setup-artifactory.sh (optional) then ./scripts/demo.sh"
+echo "Done. Next: follow docs/setup-and-validation.md (Phase 1 onward)."

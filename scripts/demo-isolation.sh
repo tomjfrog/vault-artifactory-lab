@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Phase 1 isolation tests for app ASK123 (positive prod pull, negative dev pull).
+# Phase 1 isolation tests for CMDB app ASK123 (JFrog project ask123).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,13 +12,13 @@ LAB_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 : "${VAULT_TOKEN:=root}"
 : "${PLUGIN_VAULT_PATH:=artifactory}"
 : "${JFROG_URL:?Set JFROG_URL in .env}"
-: "${DEMO_ROLE:=vaultdemo}"
-: "${DOCKER_IMAGE:=lab-demo}"
+: "${ASK123_VAULT_ROLE:=ask123}"
+: "${ASK123_DOCKER_IMAGE:=ask-123-demo}"
+: "${ASK123_PROD_REPO:=ask123-docker-prod-local}"
+: "${ASK123_DEV_REPO:=ask123-docker-dev-local}"
+: "${ASK123_GROUP:=AZU_ARTIFACTORY_ASK123}"
 : "${DOCKER_TAG:=1.0.0}"
 : "${JFROG_REGISTRY:=${JFROG_URL#https://}}"
-
-PROD_REPO="${DOCKER_PROD_REPO:-vaultdemo-docker-prod-local}"
-DEV_REPO="${DOCKER_DEV_REPO:-vaultdemo-docker-local}"
 
 export VAULT_ADDR VAULT_TOKEN
 
@@ -40,22 +40,21 @@ docker_rmi_if_present() {
   docker rmi -f "${image}" >/dev/null 2>&1 || true
 }
 
-echo "==> Issue token from role ${DEMO_ROLE}"
-RESP="$(vault read -format=json "${PLUGIN_VAULT_PATH}/token/${DEMO_ROLE}")"
+echo "==> Issue token from role ${ASK123_VAULT_ROLE}"
+RESP="$(vault read -format=json "${PLUGIN_VAULT_PATH}/token/${ASK123_VAULT_ROLE}")"
 TOKEN_USERNAME="$(echo "${RESP}" | jq -r '.data.username')"
 ACCESS_TOKEN="$(echo "${RESP}" | jq -r '.data.access_token')"
 TOKEN_SCOPE="$(echo "${RESP}" | jq -r '.data.scope')"
 echo "  username: ${TOKEN_USERNAME}"
 echo "  scope:    ${TOKEN_SCOPE}"
 
-EXPECTED_GROUP="${ARTIFACTORY_GROUP:-AZU_ARTIFACTORY_ASK123}"
-if [[ "${TOKEN_SCOPE}" != *"${EXPECTED_GROUP}"* ]]; then
-  fail "token scope missing ${EXPECTED_GROUP} — run ./scripts/setup-phase1-vault.sh (check .env does not override Phase 1 scope)"
+if [[ "${TOKEN_SCOPE}" != *"${ASK123_GROUP}"* ]]; then
+  fail "token scope missing ${ASK123_GROUP} — run ./scripts/setup-phase1-vault.sh"
 fi
 
 echo ""
 echo "==> Positive test: pull prod image (authenticated, no local cache)"
-PROD_IMAGE="${JFROG_REGISTRY}/${PROD_REPO}/${DOCKER_IMAGE}:${DOCKER_TAG}"
+PROD_IMAGE="${JFROG_REGISTRY}/${ASK123_PROD_REPO}/${ASK123_DOCKER_IMAGE}:${DOCKER_TAG}"
 docker_logout
 docker_rmi_if_present "${PROD_IMAGE}"
 docker_login "${TOKEN_USERNAME}" "${ACCESS_TOKEN}"
@@ -67,7 +66,7 @@ fi
 
 echo ""
 echo "==> Negative test: dev repo should be denied"
-DEV_IMAGE="${JFROG_REGISTRY}/${DEV_REPO}/${DOCKER_IMAGE}:${DOCKER_TAG}"
+DEV_IMAGE="${JFROG_REGISTRY}/${ASK123_DEV_REPO}/${ASK123_DOCKER_IMAGE}:${DOCKER_TAG}"
 docker_rmi_if_present "${DEV_IMAGE}"
 if docker pull "${DEV_IMAGE}" >/dev/null 2>&1; then
   fail "dev image pull should have been denied (${DEV_IMAGE})"

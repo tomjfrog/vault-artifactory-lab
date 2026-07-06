@@ -61,7 +61,7 @@ Validates the customer use-case: **Kubernetes namespace + service account → Va
 | `k8s/eso/` | VaultDynamicSecret + ExternalSecret manifests |
 | `docs/setup-and-validation.md` | **Canonical runbook** |
 | `docs/visual-architecture.md` | ERD + sequence diagrams |
-| `docs/appendix/` | History, break-glass, deep dives |
+| `docs/appendix/` | JFrog doc corrections, internal workflow notes |
 | `internal/` | Local only — customer context (gitignored) |
 | `.env.example` | Required environment variables |
 

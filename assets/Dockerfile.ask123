@@ -1,3 +1,3 @@
 FROM alpine:3.21
 
-CMD ["sh", "-c", "echo Successful Image Pull from Artifactory"]
+CMD ["sh", "-c", "echo Successful Image Pull from Artifactory (ASK123 ask-123-demo)"]

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Phase 4: cross-app isolation — ASK123 vs ASK456 tokens and prod repos.
+# Phase 4: cross-app isolation — ASK123 (project ask123) vs ASK456 (project ask456).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,22 +15,22 @@ LAB_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 : "${JFROG_REGISTRY:=${JFROG_URL#https://}}"
 : "${DOCKER_TAG:=1.0.0}"
 
-# ASK123 (Phase 1)
-: "${DEMO_ROLE:=vaultdemo}"
-: "${ASK_ID:=ASK123}"
-: "${ARTIFACTORY_GROUP:=AZU_ARTIFACTORY_${ASK_ID}}"
-: "${DOCKER_PROD_REPO:=vaultdemo-docker-prod-local}"
-: "${DOCKER_IMAGE:=lab-demo}"
+# ASK123 (JFrog project ask123)
+: "${ASK123_VAULT_ROLE:=ask123}"
+: "${ASK123_VAULT_POLICY:=ask123-pull}"
+: "${ASK123_GROUP:=AZU_ARTIFACTORY_ASK123}"
+: "${ASK123_PROD_REPO:=ask123-docker-prod-local}"
+: "${ASK123_DOCKER_IMAGE:=ask-123-demo}"
 
-# ASK456 (Phase 4)
-: "${ASK456_ID:=ASK456}"
-: "${ASK456_GROUP:=AZU_ARTIFACTORY_${ASK456_ID}}"
-: "${ASK456_ROLE:=vaultdemo-ask456}"
-: "${ASK456_PROD_REPO:=vaultdemo-docker-ask456-prod-local}"
-: "${ASK456_DOCKER_IMAGE:=lab-demo-ask456}"
-: "${ASK456_NAMESPACE:=vaultdemo-ask456-ns}"
+# ASK456 (JFrog project ask456)
+: "${ASK456_VAULT_ROLE:=ask456}"
+: "${ASK456_VAULT_POLICY:=ask456-pull}"
+: "${ASK456_GROUP:=AZU_ARTIFACTORY_ASK456}"
+: "${ASK456_PROD_REPO:=ask456-docker-prod-local}"
+: "${ASK456_DOCKER_IMAGE:=ask-456-demo}"
+: "${ASK456_NAMESPACE:=ask456-ns}"
 : "${ASK456_WORKLOAD_SA:=workload-sa}"
-: "${ASK456_K8S_AUTH_ROLE:=vaultdemo-ask456-workload}"
+: "${ASK456_K8S_AUTH_ROLE:=ask456-workload}"
 : "${VAULT_K8S_AUTH_PATH:=kubernetes}"
 
 export VAULT_ADDR VAULT_TOKEN
@@ -48,6 +48,7 @@ require_cmd() {
 require_cmd vault
 require_cmd jq
 require_cmd docker
+require_cmd kubectl
 
 docker_logout() {
   docker logout "${JFROG_REGISTRY}" >/dev/null 2>&1 || true
@@ -79,19 +80,19 @@ try_pull() {
   docker pull "${image}" >/dev/null 2>&1
 }
 
-ASK123_IMAGE="${JFROG_REGISTRY}/${DOCKER_PROD_REPO}/${DOCKER_IMAGE}:${DOCKER_TAG}"
+ASK123_IMAGE="${JFROG_REGISTRY}/${ASK123_PROD_REPO}/${ASK123_DOCKER_IMAGE}:${DOCKER_TAG}"
 ASK456_IMAGE="${JFROG_REGISTRY}/${ASK456_PROD_REPO}/${ASK456_DOCKER_IMAGE}:${DOCKER_TAG}"
 
-echo "==> Issue ASK123 token (role ${DEMO_ROLE})"
-ASK123_RESP="$(issue_token "${DEMO_ROLE}")"
+echo "==> Issue ASK123 token (role ${ASK123_VAULT_ROLE})"
+ASK123_RESP="$(issue_token "${ASK123_VAULT_ROLE}")"
 ASK123_USER="$(echo "${ASK123_RESP}" | jq -r '.data.username')"
 ASK123_TOKEN="$(echo "${ASK123_RESP}" | jq -r '.data.access_token')"
 echo "  username: ${ASK123_USER}"
-assert_scope "${ASK123_RESP}" "${ARTIFACTORY_GROUP}"
+assert_scope "${ASK123_RESP}" "${ASK123_GROUP}"
 
 echo ""
-echo "==> Issue ASK456 token (role ${ASK456_ROLE})"
-ASK456_RESP="$(issue_token "${ASK456_ROLE}")"
+echo "==> Issue ASK456 token (role ${ASK456_VAULT_ROLE})"
+ASK456_RESP="$(issue_token "${ASK456_VAULT_ROLE}")"
 ASK456_USER="$(echo "${ASK456_RESP}" | jq -r '.data.username')"
 ASK456_TOKEN="$(echo "${ASK456_RESP}" | jq -r '.data.access_token')"
 echo "  username: ${ASK456_USER}"
@@ -132,20 +133,20 @@ echo "==> Vault policy isolation: ASK456 K8s auth cannot read ASK123 token path"
 SA_JWT="$(kubectl create token "${ASK456_WORKLOAD_SA}" -n "${ASK456_NAMESPACE}" --duration=1h)"
 LOGIN_RESP="$(vault write -format=json "auth/${VAULT_K8S_AUTH_PATH}/login" role="${ASK456_K8S_AUTH_ROLE}" jwt="${SA_JWT}")"
 ASK456_VAULT_TOKEN="$(echo "${LOGIN_RESP}" | jq -r '.auth.client_token')"
-echo "${LOGIN_RESP}" | jq -r '.auth.policies | join(",")' | grep -q "${ASK456_POLICY:-vaultdemo-ask456-pull}" \
-  && pass "ASK456 SA login has vaultdemo-ask456-pull policy" \
+echo "${LOGIN_RESP}" | jq -r '.auth.policies | join(",")' | grep -q "${ASK456_VAULT_POLICY}" \
+  && pass "ASK456 SA login has ${ASK456_VAULT_POLICY} policy" \
   || fail "ASK456 SA missing expected policy"
 
-if VAULT_TOKEN="${ASK456_VAULT_TOKEN}" vault read "${PLUGIN_VAULT_PATH}/token/${DEMO_ROLE}" >/dev/null 2>&1; then
-  fail "ASK456 Vault token should not read artifactory/token/${DEMO_ROLE}"
+if VAULT_TOKEN="${ASK456_VAULT_TOKEN}" vault read "${PLUGIN_VAULT_PATH}/token/${ASK123_VAULT_ROLE}" >/dev/null 2>&1; then
+  fail "ASK456 Vault token should not read artifactory/token/${ASK123_VAULT_ROLE}"
 else
-  pass "ASK456 Vault token denied on artifactory/token/${DEMO_ROLE}"
+  pass "ASK456 Vault token denied on artifactory/token/${ASK123_VAULT_ROLE}"
 fi
 
-if VAULT_TOKEN="${ASK456_VAULT_TOKEN}" vault read "${PLUGIN_VAULT_PATH}/token/${ASK456_ROLE}" >/dev/null 2>&1; then
-  pass "ASK456 Vault token can read artifactory/token/${ASK456_ROLE}"
+if VAULT_TOKEN="${ASK456_VAULT_TOKEN}" vault read "${PLUGIN_VAULT_PATH}/token/${ASK456_VAULT_ROLE}" >/dev/null 2>&1; then
+  pass "ASK456 Vault token can read artifactory/token/${ASK456_VAULT_ROLE}"
 else
-  fail "ASK456 Vault token should read artifactory/token/${ASK456_ROLE}"
+  fail "ASK456 Vault token should read artifactory/token/${ASK456_VAULT_ROLE}"
 fi
 
 echo ""

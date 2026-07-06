@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Phase 2: Vault Kubernetes auth for workload SA → policy vaultdemo-ask123-pull.
+# Phase 2: Vault Kubernetes auth for workload SA → policy ask123-pull.
 # Prerequisites: Phase 1 complete (setup-phase1-vault.sh), kubectl cluster reachable,
 # Vault dev server running on host (Rancher Desktop k3s at 127.0.0.1:6443).
 set -euo pipefail
@@ -12,9 +12,9 @@ LAB_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 : "${VAULT_ADDR:=http://127.0.0.1:8200}"
 : "${VAULT_TOKEN:=root}"
-: "${K8S_NAMESPACE:=vaultdemo-ns}"
+: "${K8S_NAMESPACE:=ask123-ns}"
 : "${K8S_WORKLOAD_SA:=workload-sa}"
-: "${K8S_AUTH_ROLE:=vaultdemo-workload}"
+: "${K8S_AUTH_ROLE:=ask123-workload}"
 : "${VAULT_K8S_AUTH_PATH:=kubernetes}"
 : "${K8S_VAULT_AUTH_SA:=vault-auth}"
 : "${K8S_VAULT_AUTH_NS:=kube-system}"
@@ -77,7 +77,7 @@ echo "==> Create Kubernetes auth role ${K8S_AUTH_ROLE}"
 vault write "auth/${VAULT_K8S_AUTH_PATH}/role/${K8S_AUTH_ROLE}" \
   bound_service_account_names="${K8S_WORKLOAD_SA}" \
   bound_service_account_namespaces="${K8S_NAMESPACE}" \
-  policies="vaultdemo-ask123-pull" \
+  policies="${ASK123_VAULT_POLICY:-ask123-pull}" \
   ttl=1h \
   max_ttl=3h
 

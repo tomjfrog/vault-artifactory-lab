@@ -4,8 +4,6 @@ Canonical runbook for the Vault ↔ Artifactory lab: **namespace + service accou
 
 **Visual architecture (ERD + sequence diagrams):** [visual-architecture.md](visual-architecture.md)
 
-**Appendix (history, break-glass, deep dives):** [appendix/](appendix/)
-
 ---
 
 ## Customer use-case
@@ -14,9 +12,9 @@ Map each **Kubernetes namespace + workload service account** to a **CMDB applica
 
 | Layer | Binds | Lab example (ASK123) |
 |-------|-------|----------------------|
-| 1 — Artifactory RBAC | CMDB → group → permission → prod repo | `ASK123` → `AZU_ARTIFACTORY_ASK123` → READ on `vaultdemo-docker-prod-local` |
-| 2 — Vault | Plugin role (scope = group) → policy → token path | `vaultdemo` → `vaultdemo-ask123-pull` → `artifactory/token/vaultdemo` |
-| 3 — Kubernetes | SA → K8s auth role → ESO → pull secret → pod | `workload-sa` → `vaultdemo-workload` → `ExternalSecret` → `artifactory-pull` |
+| 1 — Artifactory RBAC | CMDB → group → permission → prod repo | `ASK123` → `AZU_ARTIFACTORY_ASK123` → READ on `ask123-docker-prod-local` |
+| 2 — Vault | Plugin role (scope = group) → policy → token path | `ask123` → `ask123-pull` → `artifactory/token/ask123` |
+| 3 — Kubernetes | SA → K8s auth role → ESO → pull secret → pod | `workload-sa` → `ask123-workload` → `ExternalSecret` → `artifactory-pull` |
 
 **Open question (not lab-tested):** Shared Vault across multiple clusters with namespace-scoped policies — see customer notes in `internal/customer-requirements.md`.
 
@@ -43,16 +41,16 @@ cp .env.example .env   # fill in secrets; never commit .env (VAULT_TOKEN=root is
 
 ## Provisioned resources (inventory)
 
-### JFrog Platform — ASK123
+### JFrog Platform — ASK123 (project `ask123`)
 
 | Resource | Name / key | Purpose |
 |----------|------------|---------|
-| Project | `vaultdemo` | JFrog Project for lab |
-| Dev Docker repo | `vaultdemo-docker-local` | Negative isolation tests only |
-| Prod Docker repo | `vaultdemo-docker-prod-local` | ASK123 production pulls |
+| Project | `ask123` | Dedicated JFrog Project for CMDB app ASK123 |
+| Dev Docker repo | `ask123-docker-dev-local` | Negative isolation tests only |
+| Prod Docker repo | `ask123-docker-prod-local` | ASK123 production pulls |
 | Group | `AZU_ARTIFACTORY_ASK123` | CMDB app ASK123 RBAC |
-| Permission target | `vaultdemo-ask123-prod-pull` | READ on prod repo for ASK123 group only |
-| Docker image | `lab-demo:1.0.0` | Pull verification image |
+| Permission target | `ask123-docker-prod-pull` | READ on prod repo for ASK123 group only |
+| Docker image | `ask-123-demo:1.0.0` | Pull verification image |
 
 ### Vault — ASK123
 
@@ -60,35 +58,37 @@ cp .env.example .env   # fill in secrets; never commit .env (VAULT_TOKEN=root is
 |----------|------|---------|
 | Secrets engine | `artifactory/` | Plugin mount (dynamic credentials — not KV) |
 | Admin config | `artifactory/config/admin` | Artifactory URL + bootstrap token |
-| Plugin role | `vaultdemo` | Scope `applied-permissions/groups:AZU_ARTIFACTORY_ASK123` |
-| Policy | `vaultdemo-ask123-pull` | Allows `read` on `artifactory/token/vaultdemo` |
-| Kubernetes auth | `auth/kubernetes` | SA JWT → policy `vaultdemo-ask123-pull` |
-| K8s auth role | `vaultdemo-workload` | Binds `workload-sa` in `vaultdemo-ns` |
+| Plugin role | `ask123` | Scope `applied-permissions/groups:AZU_ARTIFACTORY_ASK123` |
+| Policy | `ask123-pull` | Allows `read` on `artifactory/token/ask123` |
+| Kubernetes auth | `auth/kubernetes` | SA JWT → policy `ask123-pull` |
+| K8s auth role | `ask123-workload` | Binds `workload-sa` in `ask123-ns` |
 
 ### Kubernetes — ASK123
 
 | Resource | Namespace | Purpose |
 |----------|-----------|---------|
-| Namespace | `vaultdemo-ns` | Lab workloads |
+| Namespace | `ask123-ns` | ASK123 workloads |
 | Service account | `workload-sa` | Workload identity for Vault K8s auth |
 | Service account | `kube-system/vault-auth` | Vault token reviewer (`system:auth-delegator`) |
-| VaultDynamicSecret | `vaultdemo-ns` | ESO generator: GET `artifactory/token/vaultdemo` |
-| ExternalSecret | `vaultdemo-ns` | Syncs `artifactory-pull` (`kubernetes.io/dockerconfigjson`) |
+| VaultDynamicSecret | `ask123-ns` | ESO generator: GET `artifactory/token/ask123` |
+| ExternalSecret | `ask123-ns` | Syncs `artifactory-pull` (`kubernetes.io/dockerconfigjson`) |
 | ESO operator | `external-secrets` | Helm-installed |
 | Pod | `lab-demo-eso` | Pull verification via ESO-synced secret |
 
-### ASK456 (Phase 4 — multi-app isolation proof)
+### ASK456 (Phase 4 — project `ask456`, multi-app isolation proof)
 
 | Resource | Name / key | Purpose |
 |----------|------------|---------|
+| Project | `ask456` | Dedicated JFrog Project for CMDB app ASK456 |
+| Dev Docker repo | `ask456-docker-dev-local` | Negative isolation tests (optional) |
+| Prod Docker repo | `ask456-docker-prod-local` | ASK456 production pulls |
 | Group | `AZU_ARTIFACTORY_ASK456` | CMDB app ASK456 RBAC |
-| Prod Docker repo | `vaultdemo-docker-ask456-prod-local` | ASK456 production pulls |
-| Permission target | `vaultdemo-ask456-prod-pull` | READ on ASK456 prod repo only |
-| Docker image | `lab-demo-ask456:1.0.0` | ASK456 prod image |
-| Vault plugin role | `vaultdemo-ask456` | Scope `applied-permissions/groups:AZU_ARTIFACTORY_ASK456` |
-| Vault policy | `vaultdemo-ask456-pull` | Allows `read` on `artifactory/token/vaultdemo-ask456` |
-| Namespace | `vaultdemo-ask456-ns` | ASK456 workloads |
-| K8s auth role | `vaultdemo-ask456-workload` | Binds `workload-sa` in ASK456 namespace |
+| Permission target | `ask456-docker-prod-pull` | READ on ASK456 prod repo only |
+| Docker image | `ask-456-demo:1.0.0` | ASK456 prod image |
+| Vault plugin role | `ask456` | Scope `applied-permissions/groups:AZU_ARTIFACTORY_ASK456` |
+| Vault policy | `ask456-pull` | Allows `read` on `artifactory/token/ask456` |
+| Namespace | `ask456-ns` | ASK456 workloads |
+| K8s auth role | `ask456-workload` | Binds `workload-sa` in ASK456 namespace |
 
 Entity diagram: [visual-architecture.md#entity-relationship-diagram](visual-architecture.md#entity-relationship-diagram).
 
@@ -118,63 +118,27 @@ vault secrets list | grep artifactory
 vault read artifactory/config/admin
 ```
 
-### Phase 1 — Artifactory RBAC + Vault role (ASK123)
+### Phase 1 — Artifactory RBAC + Vault role (ASK123, project `ask123`)
 
-**Order matters:** group → prod repo → permission target → prod image → Vault role.
+**Order matters:** project → group → dev+prod repos → permission target → images → Vault role.
 
-#### 1a. Create group
+#### 1a. Artifactory provisioning (automated)
 
 ```bash
-jf api /access/api/v2/groups --server-id "${JFROG_SERVER_ID}" \
-  -X POST \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "AZU_ARTIFACTORY_ASK123",
-    "description": "CMDB app ASK123 — Vault lab prod pull",
-    "auto_join": false,
-    "admin_privileges": false
-  }'
+./scripts/setup-phase1-artifactory.sh
+```
 
+Creates JFrog project `ask123`, group `AZU_ARTIFACTORY_ASK123`, repos `ask123-docker-dev-local` and `ask123-docker-prod-local`, permission `ask123-docker-prod-pull`, and publishes `ask-123-demo:1.0.0` to both repos.
+
+Verify:
+
+```bash
 jf api /access/api/v2/groups/AZU_ARTIFACTORY_ASK123 --server-id "${JFROG_SERVER_ID}"
+jf api /access/api/v2/permissions/ask123-docker-prod-pull --server-id "${JFROG_SERVER_ID}"
+docker pull YOUR-TENANT.jfrog.io/ask123-docker-prod-local/ask-123-demo:1.0.0
 ```
 
-#### 1b. Create production Docker repository
-
-Repo key: `vaultdemo-docker-prod-local`, project `vaultdemo`, environment PROD (MCP, UI, or API).
-
-```bash
-jf rt curl -XGET "/api/repositories/vaultdemo-docker-prod-local" --server-id "${JFROG_SERVER_ID}"
-```
-
-#### 1c. Create permission target
-
-| Field | Value |
-|-------|-------|
-| Name | `vaultdemo-ask123-prod-pull` |
-| Group | `AZU_ARTIFACTORY_ASK123` |
-| Permission | **READ** on `vaultdemo-docker-prod-local/**` |
-
-Create via `POST /access/api/v2/permissions` with `name` in body (not `POST …/permissions/{name}`).
-
-```bash
-jf api /access/api/v2/permissions/vaultdemo-ask123-prod-pull --server-id "${JFROG_SERVER_ID}"
-```
-
-#### 1d. Publish image to production repo
-
-```bash
-DOCKER_REPO=vaultdemo-docker-prod-local ./assets/publish.sh
-```
-
-Or promote from dev: `jf rt docker-promote lab-demo vaultdemo-docker-local vaultdemo-docker-prod-local --source-tag=1.0.0 --copy=true --server-id "${JFROG_SERVER_ID}"`
-
-```bash
-docker pull YOUR-TENANT.jfrog.io/vaultdemo-docker-prod-local/lab-demo:1.0.0
-```
-
-Note: Docker/OCI manifests use `list.manifest.json`, not `manifest.json`. Verify with Docker Registry API or `docker pull`.
-
-#### 1e. Vault role and policy
+#### 1b. Vault role and policy
 
 ```bash
 ./scripts/setup-phase1-vault.sh
@@ -183,16 +147,16 @@ Note: Docker/OCI manifests use `list.manifest.json`, not `manifest.json`. Verify
 **Validate:**
 
 ```bash
-vault read artifactory/roles/vaultdemo
+vault read artifactory/roles/ask123
 # scope must be applied-permissions/groups:AZU_ARTIFACTORY_ASK123
 
-RESP=$(vault read -format=json artifactory/token/vaultdemo)
+RESP=$(vault read -format=json artifactory/token/ask123)
 echo "$RESP" | jq -r '.data.scope, .data.username'
 ```
 
 **Critical:** Use a single `vault read -format=json` per test. Username and `access_token` must come from the same response.
 
-#### 1f. Optional — Layer 1 isolation (host Docker)
+#### 1c. Optional — Layer 1 isolation (host Docker)
 
 Validates Artifactory RBAC without Kubernetes:
 
@@ -200,7 +164,7 @@ Validates Artifactory RBAC without Kubernetes:
 ./scripts/demo-isolation.sh
 ```
 
-**Expected:** prod pull PASS; dev repo `vaultdemo-docker-local` denied.
+**Expected:** prod pull PASS; dev repo `ask123-docker-dev-local` denied.
 
 ### Phase 2 — Vault Kubernetes auth
 
@@ -211,29 +175,27 @@ Requires Phase 1. Vault dev server on **host**; cluster API at `https://127.0.0.
 ./scripts/demo-kubernetes-auth.sh
 ```
 
-Creates `workload-sa`, `kube-system/vault-auth`, `auth/kubernetes`, role `vaultdemo-workload`.
+Creates `workload-sa`, `kube-system/vault-auth`, `auth/kubernetes`, role `ask123-workload`.
 
 | Component | Value |
 |-----------|-------|
-| Namespace | `vaultdemo-ns` |
+| Namespace | `ask123-ns` |
 | Workload SA | `workload-sa` |
-| Vault auth role | `vaultdemo-workload` |
-| Vault policy | `vaultdemo-ask123-pull` |
+| Vault auth role | `ask123-workload` |
+| Vault policy | `ask123-pull` |
 | Token reviewer SA | `kube-system/vault-auth` |
 
 **Expected:**
 
-- PASS: SA JWT → Vault login (policy `vaultdemo-ask123-pull`)
-- PASS: `artifactory/token/vaultdemo` readable without root token
+- PASS: SA JWT → Vault login (policy `ask123-pull`)
+- PASS: `artifactory/token/ask123` readable without root token
 - PASS: `artifactory/config/admin` denied
-
-Operational detail: [appendix/phase2-kubernetes-auth-notes.md](appendix/phase2-kubernetes-auth-notes.md).
 
 **Troubleshooting:**
 
 | Symptom | Fix |
 |---------|-----|
-| `permission denied` on login | Check SA name/namespace vs `vault read auth/kubernetes/role/vaultdemo-workload` |
+| `permission denied` on login | Check SA name/namespace vs `vault read auth/kubernetes/role/ask123-workload` |
 | Vault cannot reach API | Re-run setup; confirm `https://127.0.0.1:6443` from host |
 | Login OK, token read denied | Re-run `./scripts/setup-phase1-vault.sh` |
 | Reviewer JWT expired | Re-run `./scripts/setup-kubernetes-auth.sh` |
@@ -247,13 +209,13 @@ Requires Phases 1 + 2. Vault reachable from cluster at `http://host.docker.inter
 ./scripts/demo-eso.sh
 ```
 
-ESO uses **VaultDynamicSecret** (GET `artifactory/token/vaultdemo`) + **ExternalSecret** — not KV `SecretStore.remoteRef`. See [appendix/eso-vault-dynamic-secret.md](appendix/eso-vault-dynamic-secret.md).
+ESO uses **VaultDynamicSecret** (GET `artifactory/token/ask123`) + **ExternalSecret** — not KV `SecretStore.remoteRef`. The `artifactory/` mount is a plugin secrets engine (dynamic credentials), not Vault KV.
 
 | Component | Value |
 |-----------|-------|
 | ESO namespace | `external-secrets` |
-| Workload namespace | `vaultdemo-ns` |
-| VaultDynamicSecret | `artifactory-vaultdemo-token` |
+| Workload namespace | `ask123-ns` |
+| VaultDynamicSecret | `artifactory-ask123-token` |
 | ExternalSecret | `artifactory-pull` |
 | Test pod | `lab-demo-eso` |
 
@@ -269,9 +231,9 @@ Successful Image Pull from Artifactory
 
 | Question | Lab answer |
 |----------|------------|
-| SA → Vault policy? | `workload-sa` → `vaultdemo-workload` → `vaultdemo-ask123-pull` |
+| SA → Vault policy? | `workload-sa` → `ask123-workload` → `ask123-pull` |
 | ESO integration? | **VaultDynamicSecret** + K8s auth (not KV SecretStore) |
-| Token path? | **`artifactory/token/vaultdemo`** — not `artifactory/roles/…` |
+| Token path? | **`artifactory/token/ask123`** — not `artifactory/roles/…` |
 | Deployment pull? | `imagePullSecrets` → ESO-synced `artifactory-pull` |
 
 **Troubleshooting:**
@@ -283,9 +245,9 @@ Successful Image Pull from Artifactory
 | Vault restart wiped config | Dev server is in-memory; re-run Phases 0–3 |
 | `unknown field … audiences` | Not supported on VaultDynamicSecret CRD — removed from lab manifest |
 
-### Phase 4 — Multi-app isolation (ASK456)
+### Phase 4 — Multi-app isolation (ASK456, project `ask456`)
 
-Optional lab proof that two CMDB apps cannot cross-pull.
+Optional lab proof that two CMDB apps in **separate JFrog Projects** cannot cross-pull.
 
 ```bash
 ./scripts/setup-phase4-artifactory.sh
@@ -297,9 +259,7 @@ Optional lab proof that two CMDB apps cannot cross-pull.
 
 - ASK123 token pulls own prod repo; denied on ASK456 prod repo
 - ASK456 token pulls own prod repo; denied on ASK123 prod repo
-- ASK456 SA Vault token reads `artifactory/token/vaultdemo-ask456` only
-
-Details: [appendix/phase4-multi-app-isolation.md](appendix/phase4-multi-app-isolation.md).
+- ASK456 SA Vault token reads `artifactory/token/ask456` only
 
 ---
 
@@ -312,9 +272,9 @@ Run after full setup. Primary success criteria are checks **9–10** (K8s auth +
 | 1 | Vault plugin mounted | `vault secrets list` | `artifactory/` |
 | 2 | Admin config | `vault read artifactory/config/admin` | URL + token metadata |
 | 3 | ASK123 group | `jf api /access/api/v2/groups/AZU_ARTIFACTORY_ASK123 --server-id "${JFROG_SERVER_ID}"` | 200 |
-| 4 | Permission target | `jf api /access/api/v2/permissions/vaultdemo-ask123-prod-pull --server-id "${JFROG_SERVER_ID}"` | READ on prod repo |
-| 5 | Prod image exists | `jf rt curl …/v2/lab-demo/tags/list` on prod repo | tag `1.0.0` |
-| 6 | Vault role scope | `vault read artifactory/roles/vaultdemo` | `AZU_ARTIFACTORY_ASK123` in scope |
+| 4 | Permission target | `jf api /access/api/v2/permissions/ask123-docker-prod-pull --server-id "${JFROG_SERVER_ID}"` | READ on prod repo |
+| 5 | Prod image exists | `docker pull …/ask123-docker-prod-local/ask-123-demo:1.0.0` | tag `1.0.0` |
+| 6 | Vault role scope | `vault read artifactory/roles/ask123` | `AZU_ARTIFACTORY_ASK123` in scope |
 | 7 | Layer 1 isolation (optional) | `./scripts/demo-isolation.sh` | prod PASS, dev denied |
 | 8 | K8s auth login | `./scripts/demo-kubernetes-auth.sh` | SA JWT → Vault token → Artifactory token |
 | 9 | **ESO sync (primary)** | `./scripts/demo-eso.sh` | ExternalSecret Ready; pod `lab-demo-eso` Running |
@@ -323,7 +283,7 @@ Run after full setup. Primary success criteria are checks **9–10** (K8s auth +
 Quick health ping:
 
 ```bash
-RESP=$(vault read -format=json artifactory/token/vaultdemo)
+RESP=$(vault read -format=json artifactory/token/ask123)
 curl -sf -H "Authorization: Bearer $(echo "$RESP" | jq -r '.data.access_token')" \
   "${JFROG_URL}/artifactory/api/system/ping" && echo "ping OK"
 ```
@@ -340,16 +300,4 @@ curl -sf -H "Authorization: Bearer $(echo "$RESP" | jq -r '.data.access_token')"
 
 Do **not** use `jf rt curl` for Access API paths — returns 404 for `/access/api/...`.
 
----
-
-## Appendix
-
-| Doc | Contents |
-|-----|----------|
-| [appendix/eso-vault-dynamic-secret.md](appendix/eso-vault-dynamic-secret.md) | Why VaultDynamicSecret, not KV SecretStore |
-| [appendix/break-glass-manual-pull.md](appendix/break-glass-manual-pull.md) | Manual root-token pull secret (debug only) |
-| [appendix/phase2-kubernetes-auth-notes.md](appendix/phase2-kubernetes-auth-notes.md) | Rancher Desktop ops detail |
-| [appendix/phase4-multi-app-isolation.md](appendix/phase4-multi-app-isolation.md) | ASK456 architecture |
-| [appendix/lab-log.md](appendix/lab-log.md) | Chronological lab history |
-| [appendix/jfrog-doc-corrections.md](appendix/jfrog-doc-corrections.md) | JFrog doc URL/format corrections |
-| [appendix/lab-provisioned-assets.md](appendix/lab-provisioned-assets.md) | Extended inventory + verify commands |
+JFrog doc corrections (URL format, permission API): [appendix/jfrog-doc-corrections.md](appendix/jfrog-doc-corrections.md).

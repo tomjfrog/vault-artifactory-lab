@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Phase 2 validation: workload SA JWT → Vault Kubernetes auth → artifactory/token/vaultdemo.
+# Phase 2 validation: workload SA JWT → Vault Kubernetes auth → artifactory/token/ask123.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,10 +10,11 @@ LAB_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 : "${VAULT_ADDR:=http://127.0.0.1:8200}"
 : "${PLUGIN_VAULT_PATH:=artifactory}"
-: "${DEMO_ROLE:=vaultdemo}"
-: "${K8S_NAMESPACE:=vaultdemo-ns}"
+: "${ASK123_VAULT_ROLE:=ask123}"
+: "${ASK123_VAULT_POLICY:=ask123-pull}"
+: "${K8S_NAMESPACE:=ask123-ns}"
 : "${K8S_WORKLOAD_SA:=workload-sa}"
-: "${K8S_AUTH_ROLE:=vaultdemo-workload}"
+: "${K8S_AUTH_ROLE:=ask123-workload}"
 : "${VAULT_K8S_AUTH_PATH:=kubernetes}"
 : "${K8S_WORKLOAD_TOKEN_DURATION:=1h}"
 
@@ -46,13 +47,13 @@ WORKLOAD_POLICIES="$(echo "${LOGIN_RESP}" | jq -r '.auth.policies | join(",")')"
   && pass "Vault login succeeded (policies: ${WORKLOAD_POLICIES})" \
   || fail "Vault Kubernetes login failed"
 
-echo "${WORKLOAD_POLICIES}" | grep -q "vaultdemo-ask123-pull" \
-  && pass "policy vaultdemo-ask123-pull attached" \
-  || fail "expected policy vaultdemo-ask123-pull not on token"
+echo "${WORKLOAD_POLICIES}" | grep -q "${ASK123_VAULT_POLICY}" \
+  && pass "policy ${ASK123_VAULT_POLICY} attached" \
+  || fail "expected policy ${ASK123_VAULT_POLICY} not on token"
 
 echo ""
 echo "==> Read Artifactory token using workload Vault token (no root token)"
-ARTIFACTORY_RESP="$(VAULT_TOKEN="${WORKLOAD_VAULT_TOKEN}" vault read -format=json "${PLUGIN_VAULT_PATH}/token/${DEMO_ROLE}")"
+ARTIFACTORY_RESP="$(VAULT_TOKEN="${WORKLOAD_VAULT_TOKEN}" vault read -format=json "${PLUGIN_VAULT_PATH}/token/${ASK123_VAULT_ROLE}")"
 TOKEN_SCOPE="$(echo "${ARTIFACTORY_RESP}" | jq -r '.data.scope')"
 TOKEN_USERNAME="$(echo "${ARTIFACTORY_RESP}" | jq -r '.data.username')"
 ACCESS_TOKEN="$(echo "${ARTIFACTORY_RESP}" | jq -r '.data.access_token')"

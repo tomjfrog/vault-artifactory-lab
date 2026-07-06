@@ -13,10 +13,10 @@ ESO_DIR="${LAB_ROOT}/k8s/eso"
 : "${VAULT_TOKEN:=root}"
 : "${VAULT_ADDR:=http://127.0.0.1:8200}"
 : "${PLUGIN_VAULT_PATH:=artifactory}"
-: "${DEMO_ROLE:=vaultdemo}"
-: "${K8S_NAMESPACE:=vaultdemo-ns}"
+: "${ASK123_VAULT_ROLE:=ask123}"
+: "${K8S_NAMESPACE:=ask123-ns}"
 : "${K8S_WORKLOAD_SA:=workload-sa}"
-: "${K8S_AUTH_ROLE:=vaultdemo-workload}"
+: "${K8S_AUTH_ROLE:=ask123-workload}"
 : "${VAULT_K8S_AUTH_PATH:=kubernetes}"
 : "${JFROG_URL:?Set JFROG_URL in .env}"
 : "${JFROG_REGISTRY:=${JFROG_URL#https://}}"
@@ -40,8 +40,8 @@ require_cmd vault
 export VAULT_ADDR VAULT_TOKEN
 
 echo "==> Verify Vault and artifactory plugin"
-if ! vault read "${PLUGIN_VAULT_PATH}/token/${DEMO_ROLE}" >/dev/null 2>&1; then
-  echo "ERROR: cannot read ${PLUGIN_VAULT_PATH}/token/${DEMO_ROLE}" >&2
+if ! vault read "${PLUGIN_VAULT_PATH}/token/${ASK123_VAULT_ROLE}" >/dev/null 2>&1; then
+  echo "ERROR: cannot read ${PLUGIN_VAULT_PATH}/token/${ASK123_VAULT_ROLE}" >&2
   echo "  Is Vault running? Is plugin admin config valid (token not revoked)?" >&2
   exit 1
 fi
@@ -75,7 +75,7 @@ kubectl delete secret artifactory-pull -n "${K8S_NAMESPACE}" --ignore-not-found
 echo ""
 echo "==> Apply VaultDynamicSecret and ExternalSecret"
 export K8S_NAMESPACE K8S_WORKLOAD_SA K8S_AUTH_ROLE VAULT_K8S_AUTH_PATH \
-  PLUGIN_VAULT_PATH DEMO_ROLE JFROG_REGISTRY VAULT_URL_FOR_CLUSTER
+  PLUGIN_VAULT_PATH ASK123_VAULT_ROLE JFROG_REGISTRY VAULT_URL_FOR_CLUSTER
 
 envsubst < "${ESO_DIR}/vault-dynamic-secret.yaml" | kubectl apply -f -
 envsubst < "${ESO_DIR}/external-secret.yaml" | kubectl apply -f -

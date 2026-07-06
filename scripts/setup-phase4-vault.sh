@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Phase 4: Vault role/policy + Kubernetes auth for app ASK456.
-# Prerequisites: Phase 4 Artifactory (setup-phase4-artifactory.sh), Phase 2 K8s auth enabled.
+# Phase 4b: Vault role/policy + Kubernetes auth for CMDB app ASK456 (project ask456).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,11 +13,11 @@ LAB_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 : "${PLUGIN_VAULT_PATH:=artifactory}"
 : "${ASK456_ID:=ASK456}"
 : "${ASK456_GROUP:=AZU_ARTIFACTORY_${ASK456_ID}}"
-: "${ASK456_ROLE:=vaultdemo-ask456}"
-: "${ASK456_POLICY:=vaultdemo-ask456-pull}"
-: "${ASK456_NAMESPACE:=vaultdemo-ask456-ns}"
+: "${ASK456_VAULT_ROLE:=ask456}"
+: "${ASK456_VAULT_POLICY:=ask456-pull}"
+: "${ASK456_NAMESPACE:=ask456-ns}"
 : "${ASK456_WORKLOAD_SA:=workload-sa}"
-: "${ASK456_K8S_AUTH_ROLE:=vaultdemo-ask456-workload}"
+: "${ASK456_K8S_AUTH_ROLE:=ask456-workload}"
 : "${VAULT_K8S_AUTH_PATH:=kubernetes}"
 
 ASK456_SCOPE="applied-permissions/groups:${ASK456_GROUP}"
@@ -40,15 +39,15 @@ if ! vault auth list -format=json | jq -e --arg p "${VAULT_K8S_AUTH_PATH}/" '.[ 
   exit 1
 fi
 
-echo "==> Writing Vault policy ${ASK456_POLICY}"
-vault policy write "${ASK456_POLICY}" "${LAB_ROOT}/policies/${ASK456_POLICY}.hcl"
+echo "==> Writing Vault policy ${ASK456_VAULT_POLICY}"
+vault policy write "${ASK456_VAULT_POLICY}" "${LAB_ROOT}/policies/${ASK456_VAULT_POLICY}.hcl"
 
-echo "==> Writing plugin role ${ASK456_ROLE} (scope: ${ASK456_SCOPE})"
-vault write "${PLUGIN_VAULT_PATH}/roles/${ASK456_ROLE}" \
+echo "==> Writing plugin role ${ASK456_VAULT_ROLE} (scope: ${ASK456_SCOPE})"
+vault write "${PLUGIN_VAULT_PATH}/roles/${ASK456_VAULT_ROLE}" \
   scope="${ASK456_SCOPE}" \
   default_ttl=1h max_ttl=3h
 
-vault read "${PLUGIN_VAULT_PATH}/roles/${ASK456_ROLE}"
+vault read "${PLUGIN_VAULT_PATH}/roles/${ASK456_VAULT_ROLE}"
 
 echo ""
 echo "==> Kubernetes namespace and service account (${ASK456_NAMESPACE})"
@@ -60,7 +59,7 @@ echo "==> Kubernetes auth role ${ASK456_K8S_AUTH_ROLE}"
 vault write "auth/${VAULT_K8S_AUTH_PATH}/role/${ASK456_K8S_AUTH_ROLE}" \
   bound_service_account_names="${ASK456_WORKLOAD_SA}" \
   bound_service_account_namespaces="${ASK456_NAMESPACE}" \
-  policies="${ASK456_POLICY}" \
+  policies="${ASK456_VAULT_POLICY}" \
   ttl=1h \
   max_ttl=3h
 

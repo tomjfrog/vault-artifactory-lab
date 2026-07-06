@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Phase 3 validation: ESO-synced docker pull secret → prod image pod.
+# Phase 3 validation: ESO-synced docker pull secret → ASK123 prod image pod.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -8,15 +8,15 @@ LAB_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # shellcheck source=/dev/null
 [[ -f "${LAB_ROOT}/.env" ]] && source "${LAB_ROOT}/.env"
 
-: "${K8S_NAMESPACE:=vaultdemo-ns}"
+: "${K8S_NAMESPACE:=ask123-ns}"
 : "${JFROG_URL:?Set JFROG_URL in .env}"
 : "${JFROG_REGISTRY:=${JFROG_URL#https://}}"
-: "${DOCKER_PROD_REPO:=vaultdemo-docker-prod-local}"
-: "${DOCKER_IMAGE:=lab-demo}"
+: "${ASK123_PROD_REPO:=ask123-docker-prod-local}"
+: "${ASK123_DOCKER_IMAGE:=ask-123-demo}"
 : "${DOCKER_TAG:=1.0.0}"
 : "${ESO_WAIT_TIMEOUT:=180}"
 
-PROD_IMAGE="${JFROG_REGISTRY}/${DOCKER_PROD_REPO}/${DOCKER_IMAGE}:${DOCKER_TAG}"
+PROD_IMAGE="${JFROG_REGISTRY}/${ASK123_PROD_REPO}/${ASK123_DOCKER_IMAGE}:${DOCKER_TAG}"
 POD_NAME="lab-demo-eso"
 
 pass() { echo "  PASS: $1"; }
@@ -37,7 +37,7 @@ if ! kubectl wait --for=condition=Ready externalsecret/artifactory-pull -n "${K8
   echo "--- ExternalSecret describe ---"
   kubectl describe externalsecret artifactory-pull -n "${K8S_NAMESPACE}" | tail -30
   echo "--- VaultDynamicSecret describe ---"
-  kubectl describe vaultdynamicsecret artifactory-vaultdemo-token -n "${K8S_NAMESPACE}" | tail -30 2>/dev/null || true
+  kubectl describe vaultdynamicsecret artifactory-ask123-token -n "${K8S_NAMESPACE}" | tail -30 2>/dev/null || true
   fail "ExternalSecret not Ready within ${ESO_WAIT_TIMEOUT}s"
 fi
 pass "ExternalSecret artifactory-pull is Ready"
@@ -63,7 +63,7 @@ kubectl run "${POD_NAME}" \
   --image="${PROD_IMAGE}" \
   --overrides='{"spec":{"imagePullSecrets":[{"name":"artifactory-pull"}]}}' \
   --restart=Never \
-  --command -- sh -c 'echo Successful Image Pull from Artifactory; sleep 3600'
+  --command -- sh -c 'echo Successful Image Pull from Artifactory ASK123 ask-123-demo; sleep 3600'
 
 kubectl wait --for=condition=Ready "pod/${POD_NAME}" -n "${K8S_NAMESPACE}" --timeout=120s
 LOGS="$(kubectl logs "${POD_NAME}" -n "${K8S_NAMESPACE}")"

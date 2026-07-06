@@ -14,7 +14,7 @@ Map each **Kubernetes namespace + workload service account** to a **CMDB applica
 |-------|-------|----------------------|
 | 1 — Artifactory RBAC | CMDB → group → permission → prod repo | `ASK123` → `AZU_ARTIFACTORY_ASK123` → READ on `ask123-docker-prod-local` |
 | 2 — Vault | Plugin role (scope = group) → policy → token path | `ask123` → `ask123-pull` → `artifactory/token/ask123` |
-| 3 — Kubernetes | SA → K8s auth role → ESO → pull secret → pod | `workload-sa` → `ask123-workload` → `ExternalSecret` → `artifactory-pull` |
+| 3 — Kubernetes | SA → K8s auth role → ESO → pull secret → pod | `ask123-workload-sa` → `ask123-workload` → `ExternalSecret` → `artifactory-pull` |
 
 **Open question (not lab-tested):** Shared Vault across multiple clusters with namespace-scoped policies — see customer notes in `internal/customer-requirements.md`.
 
@@ -29,9 +29,8 @@ Map each **Kubernetes namespace + workload service account** to a **CMDB applica
 | JFrog CLI | `jf config add` with `--server-id` matching `JFROG_SERVER_ID` in `.env` |
 | HashiCorp Vault CLI | v2.x |
 | Docker | Build and pull images |
-| Go + GoReleaser | Build plugin from `vault-plugin-secrets-artifactory` |
 | Local Kubernetes | Rancher Desktop k3s; `kubectl` working |
-| Tools | `curl`, `jq`, `helm` (Phase 3) |
+| Tools | `curl`, `jq`, `helm` (Phase 3), `shasum` (Phase 0 checksum verify) |
 
 ```bash
 cp .env.example .env   # fill in secrets; never commit .env (VAULT_TOKEN=root is dev-only)
@@ -61,14 +60,14 @@ cp .env.example .env   # fill in secrets; never commit .env (VAULT_TOKEN=root is
 | Plugin role | `ask123` | Scope `applied-permissions/groups:AZU_ARTIFACTORY_ASK123` |
 | Policy | `ask123-pull` | Allows `read` on `artifactory/token/ask123` |
 | Kubernetes auth | `auth/kubernetes` | SA JWT → policy `ask123-pull` |
-| K8s auth role | `ask123-workload` | Binds `workload-sa` in `ask123-ns` |
+| K8s auth role | `ask123-workload` | Binds `ask123-workload-sa` in `ask123-ns` |
 
 ### Kubernetes — ASK123
 
 | Resource | Namespace | Purpose |
 |----------|-----------|---------|
 | Namespace | `ask123-ns` | ASK123 workloads |
-| Service account | `workload-sa` | Workload identity for Vault K8s auth |
+| Service account | `ask123-workload-sa` | Workload identity for Vault K8s auth |
 | Service account | `kube-system/vault-auth` | Vault token reviewer (`system:auth-delegator`) |
 | VaultDynamicSecret | `ask123-ns` | ESO generator: GET `artifactory/token/ask123` |
 | ExternalSecret | `ask123-ns` | Syncs `artifactory-pull` (`kubernetes.io/dockerconfigjson`) |
@@ -88,7 +87,8 @@ cp .env.example .env   # fill in secrets; never commit .env (VAULT_TOKEN=root is
 | Vault plugin role | `ask456` | Scope `applied-permissions/groups:AZU_ARTIFACTORY_ASK456` |
 | Vault policy | `ask456-pull` | Allows `read` on `artifactory/token/ask456` |
 | Namespace | `ask456-ns` | ASK456 workloads |
-| K8s auth role | `ask456-workload` | Binds `workload-sa` in ASK456 namespace |
+| Service account | `ask456-workload-sa` | Workload identity for Vault K8s auth |
+| K8s auth role | `ask456-workload` | Binds `ask456-workload-sa` in `ask456-ns` |
 
 Entity diagram: [visual-architecture.md#entity-relationship-diagram](visual-architecture.md#entity-relationship-diagram).
 
@@ -100,16 +100,24 @@ Complete steps in this order. Later steps depend on earlier ones.
 
 ### Phase 0 — Plugin and Vault bootstrap
 
-**Where:** `vault-plugin-secrets-artifactory` repo + `vault-artifactory-lab`
+Download the **pre-built release binary** for your OS from [GitHub releases](https://github.com/jfrog/vault-plugin-secrets-artifactory/releases), start Vault dev mode, register the plugin, and write admin config.
+
+Default release: `PLUGIN_VERSION=v1.8.9` in `.env`. On macOS the script selects `darwin_arm64` (Apple Silicon) or `darwin_amd64` (Intel) automatically.
 
 ```bash
-cd ../vault-plugin-secrets-artifactory
-make build
-
-cd ../vault-artifactory-lab
 source .env
 ./scripts/setup-vault.sh
 ```
+
+Manual steps (equivalent):
+
+```bash
+./scripts/download-plugin.sh
+./scripts/start-vault-dev.sh          # foreground Vault dev server (separate terminal)
+SKIP_VAULT_START=1 ./scripts/setup-vault.sh
+```
+
+Override release: `PLUGIN_VERSION=v1.8.8 ./scripts/download-plugin.sh`
 
 **Validate:**
 
@@ -118,7 +126,22 @@ vault secrets list | grep artifactory
 vault read artifactory/config/admin
 ```
 
-### Phase 1 — Artifactory RBAC + Vault role (ASK123, project `ask123`)
+**Note for future runs:** `setup-vault.sh` writes your bootstrap `JFROG_ACCESS_TOKEN` from `.env`, then calls `artifactory/config/rotate`. After rotation, Vault holds its own admin token — the value in `.env` is **not** used by a running Vault instance.
+
+If you **stop and restart Vault dev** (in-memory state is lost), Phase 0 runs again from scratch. You need a **valid admin-scoped token** in `.env` at that point. Tokens expire or may be revoked after rotation, so refresh before re-bootstrap:
+
+```bash
+jf access-token-create \
+  --server-id "${JFROG_SERVER_ID}" \
+  --grant-admin \
+  --description "vault-lab-bootstrap" \
+  --expiry 86400 \
+  --format json | jq -r .access_token
+```
+
+Update `JFROG_ACCESS_TOKEN` in `.env` with the output, then re-run `./scripts/setup-vault.sh`.
+
+Symptom when the bootstrap token is stale: `vault read artifactory/config/admin` returns `Token failed verification: revoked` during or immediately after Phase 0.
 
 **Order matters:** project → group → dev+prod repos → permission target → images → Vault role.
 
@@ -175,12 +198,12 @@ Requires Phase 1. Vault dev server on **host**; cluster API at `https://127.0.0.
 ./scripts/demo-kubernetes-auth.sh
 ```
 
-Creates `workload-sa`, `kube-system/vault-auth`, `auth/kubernetes`, role `ask123-workload`.
+Creates `ask123-workload-sa`, `kube-system/vault-auth`, `auth/kubernetes`, role `ask123-workload`.
 
 | Component | Value |
 |-----------|-------|
 | Namespace | `ask123-ns` |
-| Workload SA | `workload-sa` |
+| Workload SA | `ask123-workload-sa` |
 | Vault auth role | `ask123-workload` |
 | Vault policy | `ask123-pull` |
 | Token reviewer SA | `kube-system/vault-auth` |
@@ -231,7 +254,7 @@ Successful Image Pull from Artifactory
 
 | Question | Lab answer |
 |----------|------------|
-| SA → Vault policy? | `workload-sa` → `ask123-workload` → `ask123-pull` |
+| SA → Vault policy? | `ask123-workload-sa` → `ask123-workload` → `ask123-pull` |
 | ESO integration? | **VaultDynamicSecret** + K8s auth (not KV SecretStore) |
 | Token path? | **`artifactory/token/ask123`** — not `artifactory/roles/…` |
 | Deployment pull? | `imagePullSecrets` → ESO-synced `artifactory-pull` |
@@ -241,7 +264,7 @@ Successful Image Pull from Artifactory
 | Symptom | Fix |
 |---------|-----|
 | ExternalSecret `SecretSyncedError` | Confirm Vault reachable: `http://host.docker.internal:8200/v1/sys/health` from a pod |
-| `Token failed verification: revoked` | Refresh plugin admin: `jf atc --grant-admin …` then `vault write artifactory/config/admin …` |
+| `Token failed verification: revoked` | Bootstrap token in `.env` is expired or revoked — mint a new admin token (see Phase 0 **Note for future runs**), update `.env`, stop Vault, re-run `./scripts/setup-vault.sh` |
 | Vault restart wiped config | Dev server is in-memory; re-run Phases 0–3 |
 | `unknown field … audiences` | Not supported on VaultDynamicSecret CRD — removed from lab manifest |
 

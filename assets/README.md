@@ -59,7 +59,9 @@ Runbook: [docs/setup-and-validation.md](../docs/setup-and-validation.md). Visual
 
 | File | Purpose |
 |------|---------|
-| `scripts/setup-vault.sh` | Vault dev server + plugin mount |
+| `scripts/download-plugin.sh` | Download pre-built plugin from GitHub releases |
+| `scripts/start-vault-dev.sh` | Vault dev server with `-dev-plugin-dir` |
+| `scripts/setup-vault.sh` | Register plugin, enable mount, admin config |
 | `.env.example` | ASK123 and ASK456 variables |
 
 ---

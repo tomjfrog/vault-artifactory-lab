@@ -16,3 +16,7 @@ internal/*
 # Temp artifacts
 *.log
 tmp/
+.vault-plugin/
+.vault-plugin-meta/
+.vault-dev.log
+.vault-dev.pid

@@ -29,7 +29,7 @@ flowchart LR
 | Component | Location | Notes |
 |-----------|----------|-------|
 | Vault | Local (`vault server -dev`) | Demo only — not for production |
-| Plugin binary | Built from `vault-plugin-secrets-artifactory` | Registered in Vault plugin catalog |
+| Plugin binary | Pre-built from [GitHub releases](https://github.com/jfrog/vault-plugin-secrets-artifactory/releases) | Installed to `.vault-plugin/` by `download-plugin.sh` |
 | Artifactory | JFrog Cloud sandbox | Requires admin-scoped bootstrap token |
 | ESO | `external-secrets` namespace | VaultDynamicSecret + ExternalSecret |
 
@@ -54,7 +54,7 @@ sequenceDiagram
     participant Access as JFrog Access
     participant RT as Artifactory
     participant Kubelet as kubelet
-    ESO->>Vault: K8s auth workload-sa JWT
+    ESO->>Vault: K8s auth ask123-workload-sa JWT
     Vault-->>ESO: Vault token
     ESO->>Vault: GET artifactory/token/ask123
     Vault->>Plugin: issue scoped token
@@ -76,7 +76,7 @@ Each CMDB application is wired through **three independent bindings**:
 |-------|-------|----------------------|
 | 1 — Artifactory RBAC | CMDB → group → permission → prod repo | `ASK123` → `AZU_ARTIFACTORY_ASK123` → READ on `ask123-docker-prod-local` |
 | 2 — Vault | CMDB → plugin role (scope = group) → policy → token path | `ask123` role → `ask123-pull` → `artifactory/token/ask123` |
-| 3 — Kubernetes | SA → K8s auth role → policy; ESO → pull secret → pod | `workload-sa` → `ask123-workload` → ESO `ExternalSecret` → `artifactory-pull` |
+| 3 — Kubernetes | SA → K8s auth role → policy; ESO → pull secret → pod | `ask123-workload-sa` → `ask123-workload` → ESO `ExternalSecret` → `artifactory-pull` |
 
 Phase 4 repeats layers 1–3 for **ASK456**. Cross-app pulls denied at Artifactory permission targets and Vault policy boundaries.
 

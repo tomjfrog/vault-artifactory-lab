@@ -10,7 +10,7 @@ Corrections vs outdated JFrog doc examples that conflict with the plugin README 
 |-------|-------------------|-------------------|
 | Bootstrap token | Scoped token with **Admin** scope | `JFROG_ACCESS_TOKEN` in `.env` |
 | Service identity | Dedicated user (e.g. `vault-admin`) | `ARTIFACTORY_USERNAME` in `.env.example` |
-| Token rotation | Rotate after bootstrap so only Vault holds admin token | `setup-vault.sh` → `make admin` (includes rotate) |
+| Token rotation | Rotate after bootstrap so only Vault holds admin token | `setup-vault.sh` (writes admin config + `config/rotate`) |
 | Min Artifactory for rotation | 7.42.1+ | Documented in [architecture.md](../architecture.md) |
 
 ## 1. Artifactory URL format

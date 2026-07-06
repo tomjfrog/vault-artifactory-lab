@@ -112,7 +112,7 @@ erDiagram
     }
 
     K8S_SERVICE_ACCOUNT {
-        string name "workload-sa"
+        string name "ask123-workload-sa"
     }
 
     VAULT_DYNAMIC_SECRET {
@@ -194,7 +194,7 @@ Order of operations to provision **one app** (ASK123). Repeat Artifactory + Vaul
 sequenceDiagram
     autonumber
     participant Op as Operator
-    participant PluginRepo as vault-plugin-secrets-artifactory
+    participant GH as GitHub Releases
     participant Vault
     participant JFrog as JFrog Platform
     participant K8s as Kubernetes
@@ -202,8 +202,8 @@ sequenceDiagram
 
     rect rgb(240, 248, 255)
         Note over Op,Vault: Phase 0 — Plugin bootstrap
-        Op->>PluginRepo: make build
-        Op->>Vault: make start (dev server)
+        Op->>GH: download-plugin.sh (darwin_arm64 / amd64)
+        Op->>Vault: start-vault-dev.sh (dev server + plugin dir)
         Op->>Vault: register plugin, enable artifactory/
         Op->>Vault: artifactory/config/admin (URL + admin token)
     end
@@ -222,7 +222,7 @@ sequenceDiagram
 
     rect rgb(255, 240, 255)
         Note over Op,K8s: Phase 2 — Kubernetes auth
-        Op->>K8s: namespace ask123-ns, SA workload-sa
+        Op->>K8s: namespace ask123-ns, SA ask123-workload-sa
         Op->>K8s: SA vault-auth + auth-delegator (kube-system)
         Op->>Vault: enable auth/kubernetes, configure API + reviewer JWT
         Op->>Vault: role ask123-workload → policy ask123-pull
@@ -270,7 +270,7 @@ sequenceDiagram
 
     Note over ESO: Triggered by ExternalSecret refreshInterval (1h)<br/>or initial reconcile
 
-    ESO->>K8sAPI: Request SA token for workload-sa
+    ESO->>K8sAPI: Request SA token for ask123-workload-sa
     K8sAPI-->>ESO: ServiceAccount JWT
 
     ESO->>Vault: auth/kubernetes/login (role ask123-workload, jwt)
@@ -324,7 +324,7 @@ sequenceDiagram
 ```mermaid
 flowchart LR
     subgraph vault_isolation["Vault policy boundary"]
-        SA456["workload-sa<br/>ask456-ns"]
+        SA456["ask456-workload-sa<br/>ask456-ns"]
         AR456["auth role<br/>ask456-workload"]
         P456["policy<br/>ask456-pull"]
         TP456["artifactory/token/ask456"]
@@ -356,7 +356,7 @@ flowchart TB
     end
 
     subgraph L3["Layer 3 — Kubernetes"]
-        SA1["SA workload-sa"] --> KAUTH1["K8s auth role"]
+        SA1["SA ask123-workload-sa"] --> KAUTH1["K8s auth role"]
         KAUTH1 --> POL1
         ESO1["ESO ExternalSecret"] --> SEC1["pull secret"]
         SEC1 --> POD1["Pod imagePullSecrets"]
@@ -371,7 +371,7 @@ flowchart TB
 
 | Phase | Setup script | Validation script |
 |-------|--------------|-------------------|
-| 0 | `setup-vault.sh` / plugin `make setup` | `vault read artifactory/config/admin` |
+| 0 | `download-plugin.sh`, `start-vault-dev.sh`, `setup-vault.sh` | `vault read artifactory/config/admin` |
 | 1a–1c | `setup-phase1-artifactory.sh`, `setup-phase1-vault.sh` | `docker pull` prod, `vault read artifactory/roles/ask123` |
 | 1d | — | `demo-isolation.sh` (optional Layer 1) |
 | 2 | `setup-kubernetes-auth.sh` | `demo-kubernetes-auth.sh` |

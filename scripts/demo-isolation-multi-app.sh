@@ -29,7 +29,7 @@ LAB_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 : "${ASK456_PROD_REPO:=ask456-docker-prod-local}"
 : "${ASK456_DOCKER_IMAGE:=ask-456-demo}"
 : "${ASK456_NAMESPACE:=ask456-ns}"
-: "${ASK456_WORKLOAD_SA:=workload-sa}"
+: "${ASK456_WORKLOAD_SA:=ask456-workload-sa}"
 : "${ASK456_K8S_AUTH_ROLE:=ask456-workload}"
 : "${VAULT_K8S_AUTH_PATH:=kubernetes}"
 

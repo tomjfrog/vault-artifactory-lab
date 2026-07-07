@@ -74,7 +74,7 @@ cp .env.example .env   # fill in secrets; never commit .env (VAULT_TOKEN=root is
 | ESO operator | `external-secrets` | Helm-installed |
 | Pod | `lab-demo-eso` | Pull verification via ESO-synced secret |
 
-### ASK456 (Phase 4 — project `ask456`, multi-app isolation proof)
+### JFrog Platform — ASK456 (project `ask456`, Phase 4 multi-app isolation)
 
 | Resource | Name / key | Purpose |
 |----------|------------|---------|
@@ -84,11 +84,25 @@ cp .env.example .env   # fill in secrets; never commit .env (VAULT_TOKEN=root is
 | Group | `AZU_ARTIFACTORY_ASK456` | CMDB app ASK456 RBAC |
 | Permission target | `ask456-docker-prod-pull` | READ on ASK456 prod repo only |
 | Docker image | `ask-456-demo:1.0.0` | ASK456 prod image |
-| Vault plugin role | `ask456` | Scope `applied-permissions/groups:AZU_ARTIFACTORY_ASK456` |
-| Vault policy | `ask456-pull` | Allows `read` on `artifactory/token/ask456` |
+
+### Vault — ASK456
+
+| Resource | Name | Purpose |
+|----------|------|---------|
+| Plugin role | `ask456` | Scope `applied-permissions/groups:AZU_ARTIFACTORY_ASK456` |
+| Policy | `ask456-pull` | Allows `read` on `artifactory/token/ask456` |
+| K8s auth role | `ask456-workload` | Binds `ask456-workload-sa` in `ask456-ns` |
+
+Uses shared lab mounts from Phase 0–2: `artifactory/` secrets engine, `artifactory/config/admin`, and `auth/kubernetes`.
+
+### Kubernetes — ASK456
+
+| Resource | Namespace | Purpose |
+|----------|-----------|---------|
 | Namespace | `ask456-ns` | ASK456 workloads |
 | Service account | `ask456-workload-sa` | Workload identity for Vault K8s auth |
-| K8s auth role | `ask456-workload` | Binds `ask456-workload-sa` in `ask456-ns` |
+
+Phase 4 validates ASK456 via `demo-isolation-multi-app.sh` (host Docker + K8s auth login). ESO is not configured in `ask456-ns` in this lab.
 
 Entity diagram: [visual-architecture.md#entity-relationship-diagram](visual-architecture.md#entity-relationship-diagram).
 

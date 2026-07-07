@@ -40,6 +40,35 @@ cp .env.example .env   # fill in secrets; never commit .env (VAULT_TOKEN=root is
 
 ## Provisioned resources (inventory)
 
+Resources are grouped into **shared** (one per lab / Vault cluster / Kubernetes cluster) and **per CMDB app** (ASK123 or ASK456). Per-app tables list only objects scoped to that ASK ID.
+
+### Shared — JFrog Platform
+
+| Resource | Name / key | Purpose |
+|----------|------------|---------|
+| Platform tenant | `JFROG_URL` (e.g. `https://YOUR-TENANT.jfrog.io`) | Single JFrog Cloud instance; each CMDB app gets its own project |
+
+### Shared — Vault
+
+| Resource | Name | Purpose |
+|----------|------|---------|
+| Secrets engine | `artifactory/` | Plugin mount (dynamic credentials — not KV); one per Vault cluster |
+| Admin config | `artifactory/config/admin` | Artifactory URL + rotated admin token (Phase 0) |
+| Kubernetes auth | `auth/kubernetes` | Shared auth mount; each CMDB app adds its own auth role |
+| Plugin catalog entry | `artifactory` (`PLUGIN_VERSION`) | Pre-built release binary registered in Phase 0 |
+
+### Shared — Kubernetes
+
+| Resource | Namespace | Purpose |
+|----------|-----------|---------|
+| Service account | `kube-system/vault-auth` | Vault TokenReview identity (`system:auth-delegator`) |
+| ClusterRoleBinding | `vault-auth-delegator` | Grants `system:auth-delegator` to `vault-auth` SA |
+| ESO operator | `external-secrets` | Cluster-wide Helm install; reconciles ESO CRs in any workload namespace |
+
+**Lab-only (not per CMDB app):** Vault dev server on the host (`./scripts/start-vault-dev.sh`); ESO reaches Vault at `VAULT_URL_FOR_CLUSTER` (`http://host.docker.internal:8200` on Rancher Desktop).
+
+**Not shared (ASK123-only in this lab):** `VaultDynamicSecret`, `ExternalSecret`, synced secret `artifactory-pull`, and validation pod `lab-demo-eso` exist only in `ask123-ns`. ASK456 is validated without ESO (see Kubernetes — ASK456).
+
 ### JFrog Platform — ASK123 (project `ask123`)
 
 | Resource | Name / key | Purpose |
@@ -55,12 +84,9 @@ cp .env.example .env   # fill in secrets; never commit .env (VAULT_TOKEN=root is
 
 | Resource | Name | Purpose |
 |----------|------|---------|
-| Secrets engine | `artifactory/` | Plugin mount (dynamic credentials — not KV) |
-| Admin config | `artifactory/config/admin` | Artifactory URL + bootstrap token |
 | Plugin role | `ask123` | Scope `applied-permissions/groups:AZU_ARTIFACTORY_ASK123` |
 | Policy | `ask123-pull` | Allows `read` on `artifactory/token/ask123` |
-| Kubernetes auth | `auth/kubernetes` | SA JWT → policy `ask123-pull` |
-| K8s auth role | `ask123-workload` | Binds `ask123-workload-sa` in `ask123-ns` |
+| K8s auth role | `ask123-workload` | Binds `ask123-workload-sa` in `ask123-ns` → policy `ask123-pull` |
 
 ### Kubernetes — ASK123
 
@@ -68,11 +94,9 @@ cp .env.example .env   # fill in secrets; never commit .env (VAULT_TOKEN=root is
 |----------|-----------|---------|
 | Namespace | `ask123-ns` | ASK123 workloads |
 | Service account | `ask123-workload-sa` | Workload identity for Vault K8s auth |
-| Service account | `kube-system/vault-auth` | Vault token reviewer (`system:auth-delegator`) |
 | VaultDynamicSecret | `ask123-ns` | ESO generator: GET `artifactory/token/ask123` |
 | ExternalSecret | `ask123-ns` | Syncs `artifactory-pull` (`kubernetes.io/dockerconfigjson`) |
-| ESO operator | `external-secrets` | Helm-installed |
-| Pod | `lab-demo-eso` | Pull verification via ESO-synced secret |
+| Pod | `lab-demo-eso` | Pull verification via ESO-synced secret (Phase 3 demo) |
 
 ### JFrog Platform — ASK456 (project `ask456`, Phase 4 multi-app isolation)
 
@@ -91,9 +115,7 @@ cp .env.example .env   # fill in secrets; never commit .env (VAULT_TOKEN=root is
 |----------|------|---------|
 | Plugin role | `ask456` | Scope `applied-permissions/groups:AZU_ARTIFACTORY_ASK456` |
 | Policy | `ask456-pull` | Allows `read` on `artifactory/token/ask456` |
-| K8s auth role | `ask456-workload` | Binds `ask456-workload-sa` in `ask456-ns` |
-
-Uses shared lab mounts from Phase 0–2: `artifactory/` secrets engine, `artifactory/config/admin`, and `auth/kubernetes`.
+| K8s auth role | `ask456-workload` | Binds `ask456-workload-sa` in `ask456-ns` → policy `ask456-pull` |
 
 ### Kubernetes — ASK456
 

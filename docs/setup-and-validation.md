@@ -16,7 +16,7 @@ Map each **Kubernetes namespace + workload service account** to a **CMDB applica
 | 2 — Vault | Plugin role (scope = group) → policy → token path | `ask123` → `ask123-pull` → `artifactory/token/ask123` |
 | 3 — Kubernetes | SA → K8s auth role → ESO → pull secret → pod | `ask123-workload-sa` → `ask123-workload` → `ExternalSecret` → `artifactory-pull` |
 
-**Open question (not lab-tested):** Shared Vault across multiple clusters with namespace-scoped policies — see customer notes in `internal/customer-requirements.md`.
+**Open question (not lab-tested):** Shared Vault across multiple clusters with namespace-scoped policies — see customer notes in `internal/customer-requirements.md`. HashiCorp guidance: [one Kubernetes auth mount per cluster](https://developer.hashicorp.com/vault/tutorials/kubernetes/policy-templates-kubernetes) — full link list in [External references](#external-references).
 
 ---
 
@@ -360,3 +360,56 @@ curl -sf -H "Authorization: Bearer $(echo "$RESP" | jq -r '.data.access_token')"
 Do **not** use `jf rt curl` for Access API paths — returns 404 for `/access/api/...`.
 
 JFrog doc corrections (URL format, permission API): [appendix/jfrog-doc-corrections.md](appendix/jfrog-doc-corrections.md).
+
+---
+
+## External references
+
+Official documentation for concepts used in this lab. Customer Q&A with inline links: [follow-up-questions-response.md](../follow-up-questions-response.md).
+
+### HashiCorp Vault
+
+| Topic | Link |
+|-------|------|
+| Kubernetes auth method (overview, config, roles, TokenReview) | [developer.hashicorp.com/vault/docs/auth/kubernetes](https://developer.hashicorp.com/vault/docs/auth/kubernetes) |
+| Kubernetes auth — HTTP API (`/config`, `/role`, `/login`) | [developer.hashicorp.com/vault/api-docs/auth/kubernetes](https://developer.hashicorp.com/vault/api-docs/auth/kubernetes) |
+| Auth methods — enable multiple mounts at custom paths | [developer.hashicorp.com/vault/docs/auth](https://developer.hashicorp.com/vault/docs/auth) |
+| `vault auth enable -path=…` command | [developer.hashicorp.com/vault/docs/commands/auth/enable](https://developer.hashicorp.com/vault/docs/commands/auth/enable) |
+| Multi-cluster auth mount naming (one mount per cluster API endpoint) | [developer.hashicorp.com/vault/tutorials/kubernetes/policy-templates-kubernetes](https://developer.hashicorp.com/vault/tutorials/kubernetes/policy-templates-kubernetes) |
+| Kubernetes auth on EKS (role + SA binding walkthrough) | [developer.hashicorp.com/vault/tutorials/kubernetes/kubernetes-amazon-eks](https://developer.hashicorp.com/vault/tutorials/kubernetes/kubernetes-amazon-eks) |
+| Bootstrapping Kubernetes auth (Helm / in-cluster Vault) | [developer.hashicorp.com/vault/docs/deploy/kubernetes/helm/examples/kubernetes-auth](https://developer.hashicorp.com/vault/docs/deploy/kubernetes/helm/examples/kubernetes-auth) |
+| Vault policies | [developer.hashicorp.com/vault/docs/concepts/policies](https://developer.hashicorp.com/vault/docs/concepts/policies) |
+| Token TTL and lease behavior | [developer.hashicorp.com/vault/docs/concepts/tokens](https://developer.hashicorp.com/vault/docs/concepts/tokens) |
+| Plugin registration and enable | [developer.hashicorp.com/vault/docs/plugins/register](https://developer.hashicorp.com/vault/docs/plugins/register) |
+| Upgrading plugins | [developer.hashicorp.com/vault/docs/upgrading/plugins](https://developer.hashicorp.com/vault/docs/upgrading/plugins) |
+
+### Kubernetes
+
+| Topic | Link |
+|-------|------|
+| Service accounts | [kubernetes.io/docs/concepts/security/service-accounts](https://kubernetes.io/docs/concepts/security/service-accounts/) |
+| Authentication (service account tokens, TokenReview flow) | [kubernetes.io/docs/reference/access-authn-authz/authentication](https://kubernetes.io/docs/reference/access-authn-authz/authentication/) |
+| TokenReview API reference | [kubernetes.io/docs/reference/kubernetes-api/definitions/token-review-v1-authentication](https://kubernetes.io/docs/reference/kubernetes-api/definitions/token-review-v1-authentication/) |
+| RBAC built-in roles (`system:auth-delegator` for TokenReview) | [kubernetes.io/docs/reference/access-authn-authz/rbac/#user-facing-roles](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#user-facing-roles) |
+| `imagePullSecrets` on pods | [kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod](https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod) |
+| Bound service account token volume (short-lived projected tokens) | [kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#service-account-token-volume-projection](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#service-account-token-volume-projection) |
+
+### External Secrets Operator
+
+| Topic | Link |
+|-------|------|
+| HashiCorp Vault provider (Kubernetes auth, `mountPath`, `role`) | [external-secrets.io/latest/provider/hashicorp-vault](https://external-secrets.io/latest/provider/hashicorp-vault/) |
+| `VaultDynamicSecret` generator (dynamic secrets engines, e.g. `artifactory/token/…`) | [external-secrets.io/latest/api/generator/vault](https://external-secrets.io/latest/api/generator/vault/) |
+| `ExternalSecret` CRD | [external-secrets.io/latest/api/externalsecret](https://external-secrets.io/latest/api/externalsecret/) |
+
+### JFrog Platform and Vault plugin
+
+| Topic | Link |
+|-------|------|
+| Vault Artifactory secrets plugin (README, admin config, roles, token paths) | [github.com/jfrog/vault-plugin-secrets-artifactory](https://github.com/jfrog/vault-plugin-secrets-artifactory) |
+| Plugin releases (pre-built binaries) | [github.com/jfrog/vault-plugin-secrets-artifactory/releases](https://github.com/jfrog/vault-plugin-secrets-artifactory/releases) |
+| Access tokens (introduction) | [jfrog.com/help — Introduction to access tokens](https://jfrog.com/help/r/jfrog-platform-administration-documentation/introduction-to-access-tokens) |
+| Create token API (`scope`, `applied-permissions/groups:…`) | [jfrog.com/help — Create Token](https://jfrog.com/help/r/jfrog-rest-apis/create-token) |
+| Permissions and permission targets | [docs.jfrog.com/administration/docs/permissions](https://docs.jfrog.com/administration/docs/permissions) |
+| Group management | [docs.jfrog.com/artifactory/docs/group-management](https://docs.jfrog.com/artifactory/docs/group-management) |
+| Create permission target (CLI) | [docs.jfrog.com/artifactory/docs/jf-rt-permission-target-create](https://docs.jfrog.com/artifactory/docs/jf-rt-permission-target-create) |

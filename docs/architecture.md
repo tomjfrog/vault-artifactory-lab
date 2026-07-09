@@ -38,7 +38,7 @@ flowchart LR
 | Path | Purpose |
 |------|---------|
 | `artifactory/config/admin` | Artifactory URL + admin token |
-| `artifactory/config/rotate` | Rotate admin token (recommended after bootstrap) |
+| `artifactory/config/rotate` | Rotate admin token (recommended after bootstrap) — see [admin-token-bootstrap-rotation.md](admin-token-bootstrap-rotation.md) |
 | `artifactory/roles/:name` | Role definitions (scope, TTL) |
 | `artifactory/token/:role` | Issue scoped access tokens (dynamic read) |
 

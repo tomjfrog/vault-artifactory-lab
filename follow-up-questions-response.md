@@ -146,7 +146,7 @@ Phase 1 Artifactory setup (`setup-phase1-artifactory.sh`) creates:
 
 1. Bootstrap: operator places an admin-scoped token in `.env` as `JFROG_ACCESS_TOKEN` (local only, never committed).
 2. Phase 0: `vault write artifactory/config/admin url=... access_token=...` stores configuration **inside Vault** at `artifactory/config/admin` ([plugin README — Configuration](https://github.com/jfrog/vault-plugin-secrets-artifactory#configuration)).
-3. Phase 0 then runs `vault write -f artifactory/config/rotate` so the plugin holds a **rotated** admin token; the bootstrap token in `.env` is no longer what the plugin uses at runtime.
+3. Phase 0 then runs `vault write -f artifactory/config/rotate` so the plugin holds a **rotated** admin token; the bootstrap token in `.env` is no longer what the plugin uses at runtime. Details: [docs/admin-token-bootstrap-rotation.md](docs/admin-token-bootstrap-rotation.md).
 
 `vault read artifactory/config/admin` shows metadata (URL, scope, token id hash, username) — **not** the raw token value to clients with only read access.
 

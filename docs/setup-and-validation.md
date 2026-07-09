@@ -162,7 +162,7 @@ vault secrets list | grep artifactory
 vault read artifactory/config/admin
 ```
 
-**Note for future runs:** `setup-vault.sh` writes your bootstrap `JFROG_ACCESS_TOKEN` from `.env`, then calls `artifactory/config/rotate`. After rotation, Vault holds its own admin token — the value in `.env` is **not** used by a running Vault instance.
+**Note for future runs:** `setup-vault.sh` writes your bootstrap `JFROG_ACCESS_TOKEN` from `.env`, then calls `artifactory/config/rotate`. After rotation, Vault holds its own admin token — the value in `.env` is **not** used by a running Vault instance. See [admin-token-bootstrap-rotation.md](admin-token-bootstrap-rotation.md) for what rotation does, drawbacks, and break-glass guidance.
 
 If you **stop and restart Vault dev** (in-memory state is lost), Phase 0 runs again from scratch. You need a **valid admin-scoped token** in `.env` at that point. Tokens expire or may be revoked after rotation, so refresh before re-bootstrap:
 
